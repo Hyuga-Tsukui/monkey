@@ -1,6 +1,8 @@
 package lexer
 
-import "github.com/Hyuga-Tsukui/monkey/token"
+import (
+	"github.com/Hyuga-Tsukui/monkey/token"
+)
 
 type Lexer struct {
 	input        string
@@ -11,12 +13,14 @@ type Lexer struct {
 
 func New(input string) *Lexer {
 	l := &Lexer{input: input}
-	l.readCh()
+	l.readChar()
 	return l
 }
 
 func (l *Lexer) NextToken() token.Token {
 	var tok token.Token
+
+	l.skipWihtespace()
 
 	switch l.ch {
 	case '=':
@@ -28,7 +32,7 @@ func (l *Lexer) NextToken() token.Token {
 	case ';':
 		tok = newToken(token.SEMICOLON, l.ch)
 	case '(':
-		tok = newToken(token.LPAAREN, l.ch)
+		tok = newToken(token.LPAREN, l.ch)
 	case ')':
 		tok = newToken(token.RPAREN, l.ch)
 	case '{':
@@ -38,12 +42,32 @@ func (l *Lexer) NextToken() token.Token {
 	case 0:
 		tok.Literal = ""
 		tok.Type = token.EOF
+	default:
+		// Letterであれば識別子として読み進める
+		if isLetter(l.ch) {
+			tok.Literal = l.readIdentifier()
+			tok.Type = token.LookupIdent(tok.Literal)
+			return tok
+		} else if isDigit(l.ch) {
+			tok.Literal = l.readNumber()
+			tok.Type = token.INT
+			return tok
+		} else {
+			tok = newToken(token.ILLEGAL, l.ch)
+		}
 	}
-	l.readCh()
+	l.readChar()
 	return tok
 }
 
-func (l *Lexer) readCh() {
+func (l *Lexer) skipWihtespace() {
+	// wihtespaceが続く限りループして読み進める
+	for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' || l.ch == '\r' {
+		l.readChar()
+	}
+}
+
+func (l *Lexer) readChar() {
 	if l.readPosition >= len(l.input) {
 		l.ch = 0
 	} else {
@@ -51,6 +75,32 @@ func (l *Lexer) readCh() {
 	}
 	l.position = l.readPosition
 	l.readPosition += 1
+}
+
+func (l *Lexer) readIdentifier() string {
+	position := l.position
+	// Letterである限り読み進める
+	for isLetter(l.ch) {
+		l.readChar()
+	}
+	// 読み進め始めた位置から読み終わった位置までを返す
+	return l.input[position:l.position]
+}
+
+func isLetter(ch byte) bool {
+	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_'
+}
+
+func (l *Lexer) readNumber() string {
+	position := l.position
+	for isDigit(l.ch) {
+		l.readChar()
+	}
+	return l.input[position:l.position]
+}
+
+func isDigit(ch byte) bool {
+	return '0' <= ch && ch <= '9'
 }
 
 func newToken(tokenType token.TokenType, ch byte) token.Token {
