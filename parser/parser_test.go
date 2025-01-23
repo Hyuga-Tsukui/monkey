@@ -9,6 +9,7 @@ import (
 )
 
 func TestLetStatements(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name               string
 		input              string
@@ -91,6 +92,70 @@ func testLetStatement(t *testing.T, s ast.Statement, name string) bool {
 		return false
 	}
 	return true
+}
+
+func TestReturnStatements(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name           string
+		input          string
+		statementCount int
+		hasParseError  bool
+		expectedErrors []string
+	}{
+		{
+			name: "return statement",
+			input: `
+			return 5;
+			return 10;
+			return add(5, 5);
+			`,
+			statementCount: 3,
+		},
+		// {
+		// 	name: "return statement with parse error",
+		// 	input: `
+		// 	return ;
+		// 	`,
+		// 	hasParseError: true,
+		// 	expectedErrors: []string{
+		// 		"expected next token to be EXPRESSION, got = instead",
+		// 	},
+		// },
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			l := lexer.New(tt.input)
+			p := New(l)
+
+			program := p.ParseProgram()
+			if tt.hasParseError {
+				if !reflect.DeepEqual(p.errors, tt.expectedErrors) {
+					t.Errorf("p.errors = %v, want %v", p.errors, tt.expectedErrors)
+					t.Fatalf("ParseProgram() has parse error, but not expected error")
+				}
+				return
+			}
+			if program == nil {
+				t.Fatalf("ParseProgram() returned nil")
+			}
+			if len(program.Statements) != tt.statementCount {
+				t.Fatalf("program.Statements dose not contain %d statements. got=%d dump=%#v", tt.statementCount, len(program.Statements), program)
+			}
+			for _, stmt := range program.Statements {
+				returnStmt, ok := stmt.(*ast.ReturnStatement)
+				if !ok {
+					t.Fatalf("stmt not *ast.ReturnStatement, got=%T", stmt)
+					continue
+				}
+				if returnStmt.TokenLiteral() != "return" {
+					t.Errorf("returnStmt.TokenLiteral not 'return', got %q", returnStmt.ReturnValue.TokenLiteral())
+				}
+			}
+		})
+	}
 }
 
 func checkParserErrors(t *testing.T, p *Parser, expectedErrors []string) {
